@@ -11,6 +11,9 @@ import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.audiofx.LoudnessEnhancer
 import android.os.Build
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyCallback
+import android.telephony.TelephonyManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -38,6 +41,7 @@ class VoiceUpAccessibilityService : AccessibilityService() {
 
         const val PREFS = "voiceup"
         const val KEY_BUTTON_ON = "call_button_on"
+        const val KEY_AUTO = "call_assist_auto"
         const val KEY_GAIN_MB = "playback_gain_mb"
 
         /** Default playback boost: +25 dB. */
@@ -53,6 +57,15 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     private var outputPath: String = ""
     private var state: State = State.IDLE
 
+    // Button visibility is the OR of a manual toggle and (auto-mode && in-call).
+    private var manualOn = false
+    private var autoOn = false
+    private var inCall = false
+
+    private var telephony: TelephonyManager? = null
+    private var telephonyCallback: TelephonyCallback? = null
+    private var phoneStateListener: PhoneStateListener? = null
+
     /** Media volume captured before we boost it; restored after playback. */
     private var savedMusicVolume = -1
 
@@ -66,12 +79,15 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        val on = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_BUTTON_ON, false)
-        if (on) showButton()
+        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        manualOn = prefs.getBoolean(KEY_BUTTON_ON, false)
+        autoOn = prefs.getBoolean(KEY_AUTO, false)
+        if (autoOn) startCallListening()
+        updateButton()
     }
 
     override fun onDestroy() {
+        stopCallListening()
         hideButton()
         cleanupRecorder()
         releasePlayer()
@@ -108,13 +124,78 @@ class VoiceUpAccessibilityService : AccessibilityService() {
 
     // --- public control (called from MainActivity) -------------------------
 
+    /** Manual toggle: show/hide the button regardless of call state. */
     fun setButtonVisible(visible: Boolean) {
         getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_BUTTON_ON, visible).apply()
-        if (visible) showButton() else hideButton()
+        manualOn = visible
+        updateButton()
+    }
+
+    /** Auto mode: show the button only while a call is active. */
+    fun setAutoMode(enabled: Boolean) {
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_AUTO, enabled).apply()
+        autoOn = enabled
+        if (enabled) startCallListening() else stopCallListening()
+        updateButton()
+    }
+
+    // --- call-state detection ----------------------------------------------
+
+    private fun startCallListening() {
+        val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+        telephony = tm
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val cb = object : TelephonyCallback(),
+                    TelephonyCallback.CallStateListener {
+                    override fun onCallStateChanged(state: Int) =
+                        handleCallState(state)
+                }
+                telephonyCallback = cb
+                tm.registerTelephonyCallback(mainExecutor, cb)
+            } else {
+                val listener = object : PhoneStateListener() {
+                    @Deprecated("Deprecated in Java")
+                    override fun onCallStateChanged(state: Int, phoneNumber: String?) =
+                        handleCallState(state)
+                }
+                phoneStateListener = listener
+                @Suppress("DEPRECATION")
+                tm.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+            }
+        } catch (_: SecurityException) {
+            // READ_PHONE_STATE not granted yet — auto mode simply won't fire.
+        }
+    }
+
+    private fun stopCallListening() {
+        val tm = telephony ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                telephonyCallback?.let { tm.unregisterTelephonyCallback(it) }
+            } else {
+                @Suppress("DEPRECATION")
+                phoneStateListener?.let { tm.listen(it, PhoneStateListener.LISTEN_NONE) }
+            }
+        } catch (_: Exception) {
+        }
+        telephonyCallback = null
+        phoneStateListener = null
+        inCall = false
+    }
+
+    private fun handleCallState(state: Int) {
+        inCall = state == TelephonyManager.CALL_STATE_OFFHOOK
+        updateButton()
     }
 
     // --- floating button ---------------------------------------------------
+
+    private fun updateButton() {
+        if (manualOn || (autoOn && inCall)) showButton() else hideButton()
+    }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()

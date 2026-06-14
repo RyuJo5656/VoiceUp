@@ -25,6 +25,16 @@ class CallAssist {
       await _channel.invokeMethod<bool>('setCallButton', {'show': show}) ??
       false;
 
+  /// Whether auto mode (show button while a call is active) is on.
+  static Future<bool> isAutoEnabled() async =>
+      await _channel.invokeMethod<bool>('isAutoEnabled') ?? false;
+
+  /// Enables/disables auto mode. Returns `true` if applied to the running
+  /// service, `false` if it isn't enabled yet (the flag is remembered).
+  static Future<bool> setAutoMode(bool enabled) async =>
+      await _channel.invokeMethod<bool>('setAutoMode', {'enabled': enabled}) ??
+      false;
+
   /// Playback boost applied to the recorded voice, in millibels (100 mB = 1 dB).
   static const int defaultGainMb = 2500;
   static const int maxGainMb = 3500;

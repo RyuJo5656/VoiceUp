@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/audio/call_mode_bar.dart';
 import '../../core/overlay/call_assist.dart';
@@ -25,6 +26,7 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
   bool _listening = false;
   bool _speaking = false;
   bool _assistActive = false;
+  bool _auto = false;
   int _gainMb = CallAssist.defaultGainMb;
   String _partial = '';
   String? _error;
@@ -33,6 +35,45 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
   void initState() {
     super.initState();
     _loadGain();
+    _loadAuto();
+  }
+
+  Future<void> _loadAuto() async {
+    final auto = await CallAssist.isAutoEnabled();
+    if (mounted) setState(() => _auto = auto);
+  }
+
+  Future<void> _toggleAuto(bool value) async {
+    if (!value) {
+      await CallAssist.setAutoMode(false);
+      if (mounted) setState(() => _auto = false);
+      return;
+    }
+    // Auto mode needs the accessibility service + phone-state permission.
+    if (!await CallAssist.isAccessibilityEnabled()) {
+      if (!mounted) return;
+      final go = await _showEnableDialog();
+      if (go == true) await CallAssist.openAccessibilitySettings();
+      return;
+    }
+    final status = await Permission.phone.request();
+    if (!status.isGranted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('통화 감지를 위해 전화 상태 권한이 필요해요.')),
+      );
+      return;
+    }
+    final applied = await CallAssist.setAutoMode(true);
+    if (!mounted) return;
+    setState(() => _auto = applied);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(applied
+            ? '이제 통화가 시작되면 버튼이 자동으로 떠요.'
+            : '접근성을 켠 뒤 다시 시도해 주세요.'),
+      ),
+    );
   }
 
   @override
@@ -181,7 +222,14 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
                   : Icons.picture_in_picture_alt),
               label: Text(_assistActive
                   ? '통화 보조 버튼 닫기'
-                  : '통화 중 띄우기 (화면 위 버튼)'),
+                  : '지금 띄우기 (테스트)'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _auto,
+              onChanged: _toggleAuto,
+              title: const Text('통화 시 자동으로 버튼 띄우기'),
+              subtitle: const Text('전화가 시작되면 버튼이 뜨고, 끝나면 사라져요'),
             ),
             Row(
               children: [

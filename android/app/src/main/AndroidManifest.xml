@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!-- 블루투스 기기로 통화 라우팅(공공 모드, 선택) -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- 통화 시작/종료 감지(자동 버튼 표시) -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
 
     <application
         android:label="VoiceUp"

@@ -68,25 +68,45 @@ class MainActivity : FlutterActivity() {
                         val show = call.argument<Boolean>("show") ?: false
                         val svc = VoiceUpAccessibilityService.instance
                         if (svc == null) {
-                            // Persist intent so the service shows it once enabled.
-                            getSharedPreferences(
-                                VoiceUpAccessibilityService.PREFS,
-                                Context.MODE_PRIVATE,
-                            ).edit()
-                                .putBoolean(
-                                    VoiceUpAccessibilityService.KEY_BUTTON_ON,
-                                    show,
-                                )
-                                .apply()
+                            persistFlag(
+                                VoiceUpAccessibilityService.KEY_BUTTON_ON,
+                                show,
+                            )
                             result.success(false)
                         } else {
                             svc.setButtonVisible(show)
                             result.success(true)
                         }
                     }
+                    "setAutoMode" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        val svc = VoiceUpAccessibilityService.instance
+                        if (svc == null) {
+                            persistFlag(VoiceUpAccessibilityService.KEY_AUTO, enabled)
+                            result.success(false)
+                        } else {
+                            svc.setAutoMode(enabled)
+                            result.success(true)
+                        }
+                    }
+                    "isAutoEnabled" -> {
+                        val on = getSharedPreferences(
+                            VoiceUpAccessibilityService.PREFS,
+                            Context.MODE_PRIVATE,
+                        ).getBoolean(VoiceUpAccessibilityService.KEY_AUTO, false)
+                        result.success(on)
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Remembers a flag so the service applies it once enabled. */
+    private fun persistFlag(key: String, value: Boolean) {
+        getSharedPreferences(
+            VoiceUpAccessibilityService.PREFS,
+            Context.MODE_PRIVATE,
+        ).edit().putBoolean(key, value).apply()
     }
 
     private fun isAccessibilityEnabled(): Boolean {
