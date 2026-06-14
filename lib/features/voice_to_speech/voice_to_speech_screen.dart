@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/audio/call_mode_bar.dart';
+import '../../core/overlay/call_assist.dart';
 import '../../core/services/system_stt_service.dart';
 import '../../core/services/system_tts_service.dart';
 
@@ -87,6 +88,19 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
     }
   }
 
+  Future<void> _launchCallAssist() async {
+    final result = await CallAssist.launch();
+    if (!mounted) return;
+    final msg = switch (result) {
+      CallAssistResult.launched =>
+        '화면 위에 버튼을 띄웠어요. 통화를 스피커폰으로 켜고 사용하세요.',
+      CallAssistResult.alreadyActive => '이미 떠 있어요. 화면 위 버튼을 사용하세요.',
+      CallAssistResult.permissionDenied =>
+        "'다른 앱 위에 표시' 권한이 필요해요. 설정에서 허용해 주세요.",
+    };
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final liveText = _listening && _partial.isNotEmpty ? _partial : null;
@@ -98,6 +112,12 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const CallModeBar(),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _launchCallAssist,
+              icon: const Icon(Icons.picture_in_picture_alt),
+              label: const Text('통화 중 띄우기 (화면 위 버튼)'),
+            ),
             const SizedBox(height: 16),
             const Text(
               '마이크를 누르고 작게 말하세요.\n인식된 문장이 큰 목소리로 재생됩니다.',

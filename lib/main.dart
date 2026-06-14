@@ -6,6 +6,15 @@ import 'features/amplifier/amplifier_screen.dart';
 import 'features/phrase_pad/phrase_pad_screen.dart';
 import 'features/voice_journal/voice_journal_screen.dart';
 import 'features/voice_to_speech/voice_to_speech_screen.dart';
+import 'overlay/call_overlay.dart';
+
+/// Entry point for the floating call-assist overlay, rendered in a separate
+/// Flutter engine by `flutter_overlay_window`. Must stay top-level and
+/// annotated so the compiler keeps it reachable.
+@pragma('vm:entry-point')
+void overlayMain() {
+  runApp(const CallOverlayApp());
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
