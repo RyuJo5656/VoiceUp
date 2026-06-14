@@ -24,8 +24,15 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
 
   bool _listening = false;
   bool _speaking = false;
+  bool _assistActive = false;
   String _partial = '';
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAssistState();
+  }
 
   @override
   void dispose() {
@@ -33,6 +40,11 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
     _tts.stop();
     _textCtl.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshAssistState() async {
+    final active = await CallAssist.isActive();
+    if (mounted) setState(() => _assistActive = active);
   }
 
   Future<void> _toggleListen() async {
@@ -88,12 +100,22 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
     }
   }
 
-  Future<void> _launchCallAssist() async {
+  Future<void> _toggleCallAssist() async {
+    if (await CallAssist.isActive()) {
+      await CallAssist.close();
+      if (!mounted) return;
+      setState(() => _assistActive = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('통화 보조 버튼을 닫았어요.')),
+      );
+      return;
+    }
     final result = await CallAssist.launch();
     if (!mounted) return;
+    setState(() => _assistActive = result != CallAssistResult.permissionDenied);
     final msg = switch (result) {
       CallAssistResult.launched =>
-        '화면 위에 버튼을 띄웠어요. 통화를 스피커폰으로 켜고 사용하세요.',
+        '화면 위에 마이크 버튼을 띄웠어요. 통화를 스피커폰으로 켜고 누른 채 말하세요.',
       CallAssistResult.alreadyActive => '이미 떠 있어요. 화면 위 버튼을 사용하세요.',
       CallAssistResult.permissionDenied =>
         "'다른 앱 위에 표시' 권한이 필요해요. 설정에서 허용해 주세요.",
@@ -114,9 +136,13 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
             const CallModeBar(),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: _launchCallAssist,
-              icon: const Icon(Icons.picture_in_picture_alt),
-              label: const Text('통화 중 띄우기 (화면 위 버튼)'),
+              onPressed: _toggleCallAssist,
+              icon: Icon(_assistActive
+                  ? Icons.close
+                  : Icons.picture_in_picture_alt),
+              label: Text(_assistActive
+                  ? '통화 보조 버튼 닫기'
+                  : '통화 중 띄우기 (화면 위 버튼)'),
             ),
             const SizedBox(height: 16),
             const Text(

@@ -33,13 +33,15 @@ class CallAssist {
 
     if (await isActive()) return CallAssistResult.alreadyActive;
 
+    // Small square window just big enough for the round button. Drag is off
+    // so a press-and-hold records instead of being swallowed as a drag.
     await FlutterOverlayWindow.showOverlay(
-      height: 360,
-      width: WindowSize.matchParent,
-      alignment: OverlayAlignment.bottomCenter,
+      height: 320,
+      width: 320,
+      alignment: OverlayAlignment.centerRight,
       flag: OverlayFlag.defaultFlag,
-      enableDrag: true,
-      positionGravity: PositionGravity.auto,
+      enableDrag: false,
+      positionGravity: PositionGravity.none,
       overlayTitle: 'VoiceUp 통화 보조',
       overlayContent: '통화 중 큰 소리로 재생할 수 있어요',
     );
