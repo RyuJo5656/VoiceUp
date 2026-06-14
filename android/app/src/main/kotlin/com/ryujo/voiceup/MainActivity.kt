@@ -1,38 +1,80 @@
 package com.ryujo.voiceup
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Native side of the call-mode feature.
- *
- * Dart calls `setCallMode` over the `voiceup/audio_route` channel with one of
- * "off" / "private" / "public". We toggle the loudspeaker so that, during a
- * phone call, the amplified TTS is heard by the other party:
- *  - private: speakerphone ON (at home / in a car).
- *  - public:  speakerphone OFF — the call stays on the earpiece/Bluetooth so
- *             only the phone's own TTS plays out loud, not the conversation.
- *  - off:     leave routing untouched.
+ * Hosts two method channels:
+ *  - `voiceup/audio_route`  : speakerphone routing for the call-mode bar.
+ *  - `voiceup/call_button`  : controls the accessibility floating mic button.
  */
 class MainActivity : FlutterActivity() {
-    private val channelName = "voiceup/audio_route"
+    private val audioChannel = "voiceup/audio_route"
+    private val buttonChannel = "voiceup/call_button"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setCallMode" -> {
-                        val mode = call.argument<String>("mode") ?: "off"
-                        applyCallMode(mode)
+                        applyCallMode(call.argument<String>("mode") ?: "off")
                         result.success(null)
                     }
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, buttonChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isAccessibilityEnabled" ->
+                        result.success(isAccessibilityEnabled())
+                    "openAccessibilitySettings" -> {
+                        startActivity(
+                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                        result.success(null)
+                    }
+                    "setCallButton" -> {
+                        val show = call.argument<Boolean>("show") ?: false
+                        val svc = VoiceUpAccessibilityService.instance
+                        if (svc == null) {
+                            // Persist intent so the service shows it once enabled.
+                            getSharedPreferences(
+                                VoiceUpAccessibilityService.PREFS,
+                                Context.MODE_PRIVATE,
+                            ).edit()
+                                .putBoolean(
+                                    VoiceUpAccessibilityService.KEY_BUTTON_ON,
+                                    show,
+                                )
+                                .apply()
+                            result.success(false)
+                        } else {
+                            svc.setButtonVisible(show)
+                            result.success(true)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        val expected = "$packageName/$packageName.VoiceUpAccessibilityService"
+        val enabled = Settings.Secure.getString(
+            contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     private fun applyCallMode(mode: String) {

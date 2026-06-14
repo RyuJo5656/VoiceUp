@@ -29,22 +29,11 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _refreshAssistState();
-  }
-
-  @override
   void dispose() {
     _stt.cancel();
     _tts.stop();
     _textCtl.dispose();
     super.dispose();
-  }
-
-  Future<void> _refreshAssistState() async {
-    final active = await CallAssist.isActive();
-    if (mounted) setState(() => _assistActive = active);
   }
 
   Future<void> _toggleListen() async {
@@ -101,26 +90,64 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
   }
 
   Future<void> _toggleCallAssist() async {
-    if (await CallAssist.isActive()) {
-      await CallAssist.close();
+    // Turn the button off.
+    if (_assistActive) {
+      await CallAssist.setButton(false);
       if (!mounted) return;
       setState(() => _assistActive = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('통화 보조 버튼을 닫았어요.')),
+        const SnackBar(content: Text('통화 보조 버튼을 껐어요.')),
       );
       return;
     }
-    final result = await CallAssist.launch();
+
+    // Needs the accessibility service enabled first.
+    if (!await CallAssist.isAccessibilityEnabled()) {
+      if (!mounted) return;
+      final go = await _showEnableDialog();
+      if (go == true) await CallAssist.openAccessibilitySettings();
+      return;
+    }
+
+    final applied = await CallAssist.setButton(true);
     if (!mounted) return;
-    setState(() => _assistActive = result != CallAssistResult.permissionDenied);
-    final msg = switch (result) {
-      CallAssistResult.launched =>
-        '화면 위에 마이크 버튼을 띄웠어요. 통화를 스피커폰으로 켜고 누른 채 말하세요.',
-      CallAssistResult.alreadyActive => '이미 떠 있어요. 화면 위 버튼을 사용하세요.',
-      CallAssistResult.permissionDenied =>
-        "'다른 앱 위에 표시' 권한이 필요해요. 설정에서 허용해 주세요.",
-    };
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (applied) {
+      setState(() => _assistActive = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('화면에 마이크 버튼을 띄웠어요. 스피커폰 통화 중 눌러서 사용하세요.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('접근성 권한을 켠 뒤 다시 눌러 주세요.')),
+      );
+      await CallAssist.openAccessibilitySettings();
+    }
+  }
+
+  Future<bool?> _showEnableDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('통화 보조 버튼 켜기'),
+        content: const Text(
+          '통화 화면 위에서도 눌리는 버튼을 띄우려면 "접근성" 권한이 필요해요.\n\n'
+          '설정 → 접근성 → VoiceUp 통화 보조 버튼 → 켜기\n\n'
+          'VoiceUp은 화면 내용을 읽지 않고, 버튼 표시 용도로만 사용합니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
