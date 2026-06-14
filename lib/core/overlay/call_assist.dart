@@ -24,4 +24,14 @@ class CallAssist {
   static Future<bool> setButton(bool show) async =>
       await _channel.invokeMethod<bool>('setCallButton', {'show': show}) ??
       false;
+
+  /// Playback boost applied to the recorded voice, in millibels (100 mB = 1 dB).
+  static const int defaultGainMb = 2500;
+  static const int maxGainMb = 3500;
+
+  static Future<int> getPlaybackGain() async =>
+      await _channel.invokeMethod<int>('getPlaybackGain') ?? defaultGainMb;
+
+  static Future<void> setPlaybackGain(int gainMb) =>
+      _channel.invokeMethod('setPlaybackGain', {'gainMb': gainMb});
 }

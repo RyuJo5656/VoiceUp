@@ -43,6 +43,27 @@ class MainActivity : FlutterActivity() {
                         )
                         result.success(null)
                     }
+                    "getPlaybackGain" -> {
+                        val gain = getSharedPreferences(
+                            VoiceUpAccessibilityService.PREFS,
+                            Context.MODE_PRIVATE,
+                        ).getInt(
+                            VoiceUpAccessibilityService.KEY_GAIN_MB,
+                            VoiceUpAccessibilityService.DEFAULT_GAIN_MB,
+                        )
+                        result.success(gain)
+                    }
+                    "setPlaybackGain" -> {
+                        val gain = call.argument<Int>("gainMb")
+                            ?: VoiceUpAccessibilityService.DEFAULT_GAIN_MB
+                        getSharedPreferences(
+                            VoiceUpAccessibilityService.PREFS,
+                            Context.MODE_PRIVATE,
+                        ).edit()
+                            .putInt(VoiceUpAccessibilityService.KEY_GAIN_MB, gain)
+                            .apply()
+                        result.success(null)
+                    }
                     "setCallButton" -> {
                         val show = call.argument<Boolean>("show") ?: false
                         val svc = VoiceUpAccessibilityService.instance

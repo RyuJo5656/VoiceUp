@@ -38,6 +38,10 @@ class VoiceUpAccessibilityService : AccessibilityService() {
 
         const val PREFS = "voiceup"
         const val KEY_BUTTON_ON = "call_button_on"
+        const val KEY_GAIN_MB = "playback_gain_mb"
+
+        /** Default playback boost: +25 dB. */
+        const val DEFAULT_GAIN_MB = 2500
     }
 
     private enum class State { IDLE, RECORDING, PLAYING }
@@ -49,8 +53,10 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     private var outputPath: String = ""
     private var state: State = State.IDLE
 
-    /** Extra playback gain in millibels (+25 dB) to lift a soft voice. */
-    private val playbackGainMb = 2500
+    /** User-tunable playback boost (millibels), read fresh on each playback. */
+    private fun currentGainMb(): Int =
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_GAIN_MB, DEFAULT_GAIN_MB)
 
     // --- lifecycle ---------------------------------------------------------
 
@@ -237,12 +243,15 @@ class VoiceUpAccessibilityService : AccessibilityService() {
             }
             // Boost a soft recording well beyond the raw level so it survives
             // the call's echo cancellation when picked up on speakerphone.
-            try {
-                enhancer = LoudnessEnhancer(mp.audioSessionId).apply {
-                    setTargetGain(playbackGainMb)
-                    enabled = true
+            val gain = currentGainMb()
+            if (gain > 0) {
+                try {
+                    enhancer = LoudnessEnhancer(mp.audioSessionId).apply {
+                        setTargetGain(gain)
+                        enabled = true
+                    }
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {
             }
             mp.setOnCompletionListener {
                 applyState(State.IDLE)

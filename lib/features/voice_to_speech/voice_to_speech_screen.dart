@@ -25,8 +25,15 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
   bool _listening = false;
   bool _speaking = false;
   bool _assistActive = false;
+  int _gainMb = CallAssist.defaultGainMb;
   String _partial = '';
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGain();
+  }
 
   @override
   void dispose() {
@@ -34,6 +41,11 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
     _tts.stop();
     _textCtl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadGain() async {
+    final gain = await CallAssist.getPlaybackGain();
+    if (mounted) setState(() => _gainMb = gain);
   }
 
   Future<void> _toggleListen() async {
@@ -170,6 +182,23 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
               label: Text(_assistActive
                   ? '통화 보조 버튼 닫기'
                   : '통화 중 띄우기 (화면 위 버튼)'),
+            ),
+            Row(
+              children: [
+                const Icon(Icons.volume_up, size: 18),
+                const SizedBox(width: 4),
+                Text('통화 보조 재생 음량  +${(_gainMb / 100).round()}dB',
+                    style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+            Slider(
+              value: _gainMb.toDouble(),
+              min: 0,
+              max: CallAssist.maxGainMb.toDouble(),
+              divisions: CallAssist.maxGainMb ~/ 250,
+              label: '+${(_gainMb / 100).round()}dB',
+              onChanged: (v) => setState(() => _gainMb = v.round()),
+              onChangeEnd: (v) => CallAssist.setPlaybackGain(v.round()),
             ),
             const SizedBox(height: 16),
             const Text(
