@@ -1,0 +1,66 @@
+# VoiceUp
+
+목소리가 잘 나오지 않는 분(성대·갑상선 수술 등)을 위한 안드로이드 음성 보조 앱입니다.
+작게 말해도 또렷하고 크게 전달되도록 돕습니다.
+
+## 기능
+
+| 탭 | 하는 일 | 사용법 |
+|---|---|---|
+| **말하기** | 작게 말하면 인식해서 **큰 목소리로 읽어줌** (STT→TTS) | 마이크 버튼을 누르고 말하면, 인식된 문장을 큰 소리로 재생 |
+| **문장** | 자주 쓰는 말을 탭 한 번으로 재생 | 카드를 탭하면 읽어줌 · 길게 누르면 삭제 · ＋로 추가 |
+| **증폭** | 누르고 말하면 녹음 후 크게 재생 | 큰 버튼을 **길게 누르는 동안** 말하고, 떼면 재생 |
+| **일지** | "아—" 5초 발성을 녹음해 목 상태 추적 | 버튼을 눌러 5초 녹음 → 날짜별로 저장 |
+
+> **말하기**·**문장** 화면 위의 **통화 모드** 막대는 전화 통화 중 음성 라우팅을 바꿉니다.
+> *혼자*(집·차: 스피커폰 ON) / *공공*(카페: 통화는 이어폰, 폰 스피커로는 합성음만).
+
+## 실행 방법 (Windows + 안드로이드폰)
+
+```bash
+# 1) 의존성 설치
+flutter pub get
+
+# 2) 폰을 USB로 연결하고 개발자 모드/USB 디버깅 켜기
+flutter devices          # 폰이 보이는지 확인
+
+# 3) 실행
+flutter run
+
+# 또는 설치용 APK만 만들기
+flutter build apk --release
+# 결과물: build/app/outputs/flutter-apk/app-release.apk  →  폰에 옮겨 설치
+```
+
+요구 사항: Flutter 3.32+, 안드로이드 7.0(API 24) 이상.
+
+## 음성 인식 품질 (Clova 선택 사항)
+
+기본은 **무료 시스템 음성**(구글 STT/TTS)으로 동작하며 키가 없어도 됩니다.
+목소리가 작거나 숨소리가 많아 인식이 잘 안 되면, 네이버 **Clova** 키를 넣어
+정확도를 높일 수 있습니다.
+
+1. [네이버 클라우드 플랫폼](https://www.ncloud.com)에서 CSR(음성인식)·TTS(음성합성) 신청
+2. 프로젝트 루트의 `.env` 파일에 발급받은 키 입력 (`.env.example` 참고)
+3. `flutter run` 다시 실행
+
+`.env`의 키는 비워두어도 앱이 정상 동작합니다.
+
+## 구조
+
+```
+lib/
+├─ main.dart                 # 앱 진입점 · 하단 탭 네비게이션
+├─ core/
+│  ├─ theme/                 # Material 3 테마
+│  ├─ config/env.dart        # .env 키 읽기
+│  ├─ audio/                 # 녹음·재생·통화모드
+│  └─ services/              # 시스템 STT/TTS · Clova STT/TTS
+└─ features/
+   ├─ voice_to_speech/       # 말하기
+   ├─ phrase_pad/            # 문장
+   ├─ amplifier/             # 증폭
+   └─ voice_journal/         # 일지
+```
+
+네이티브 통화모드 라우팅: `android/app/src/main/kotlin/com/ryujo/voiceup/MainActivity.kt`
