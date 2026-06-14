@@ -9,6 +9,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.audiofx.LoudnessEnhancer
 import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
@@ -44,8 +45,12 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     private var buttonView: TextView? = null
     private var recorder: MediaRecorder? = null
     private var player: MediaPlayer? = null
+    private var enhancer: LoudnessEnhancer? = null
     private var outputPath: String = ""
     private var state: State = State.IDLE
+
+    /** Extra playback gain in millibels (+25 dB) to lift a soft voice. */
+    private val playbackGainMb = 2500
 
     // --- lifecycle ---------------------------------------------------------
 
@@ -60,10 +65,22 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         hideButton()
         cleanupRecorder()
-        player?.release()
-        player = null
+        releasePlayer()
         instance = null
         super.onDestroy()
+    }
+
+    private fun releasePlayer() {
+        try {
+            enhancer?.release()
+        } catch (_: Exception) {
+        }
+        enhancer = null
+        try {
+            player?.release()
+        } catch (_: Exception) {
+        }
+        player = null
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
@@ -206,8 +223,8 @@ class VoiceUpAccessibilityService : AccessibilityService() {
                 audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
                 0,
             )
-            player?.release()
-            player = MediaPlayer().apply {
+            releasePlayer()
+            val mp = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -216,14 +233,23 @@ class VoiceUpAccessibilityService : AccessibilityService() {
                 )
                 setDataSource(path)
                 setVolume(1f, 1f)
-                setOnCompletionListener {
-                    applyState(State.IDLE)
-                    it.release()
-                    player = null
-                }
                 prepare()
-                start()
             }
+            // Boost a soft recording well beyond the raw level so it survives
+            // the call's echo cancellation when picked up on speakerphone.
+            try {
+                enhancer = LoudnessEnhancer(mp.audioSessionId).apply {
+                    setTargetGain(playbackGainMb)
+                    enabled = true
+                }
+            } catch (_: Exception) {
+            }
+            mp.setOnCompletionListener {
+                applyState(State.IDLE)
+                releasePlayer()
+            }
+            mp.start()
+            player = mp
             applyState(State.PLAYING)
         } catch (_: Exception) {
             applyState(State.IDLE)
