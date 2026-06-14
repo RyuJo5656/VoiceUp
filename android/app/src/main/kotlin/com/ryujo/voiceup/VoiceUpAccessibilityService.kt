@@ -53,6 +53,9 @@ class VoiceUpAccessibilityService : AccessibilityService() {
     private var outputPath: String = ""
     private var state: State = State.IDLE
 
+    /** Media volume captured before we boost it; restored after playback. */
+    private var savedMusicVolume = -1
+
     /** User-tunable playback boost (millibels), read fresh on each playback. */
     private fun currentGainMb(): Int =
         getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -87,6 +90,17 @@ class VoiceUpAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {
         }
         player = null
+        restoreMusicVolume()
+    }
+
+    private fun restoreMusicVolume() {
+        if (savedMusicVolume < 0) return
+        try {
+            (getSystemService(AUDIO_SERVICE) as AudioManager)
+                .setStreamVolume(AudioManager.STREAM_MUSIC, savedMusicVolume, 0)
+        } catch (_: Exception) {
+        }
+        savedMusicVolume = -1
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
@@ -221,15 +235,17 @@ class VoiceUpAccessibilityService : AccessibilityService() {
 
     private fun playFile(path: String) {
         try {
-            // Make sure media playback is at full volume so it carries to the
-            // call mic on speakerphone.
+            releasePlayer()
+            // Briefly raise media volume so the playback carries to the call
+            // mic on speakerphone, after saving the user's level to restore it
+            // the moment playback finishes (releasePlayer → restoreMusicVolume).
             val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+            savedMusicVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
             audio.setStreamVolume(
                 AudioManager.STREAM_MUSIC,
                 audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
                 0,
             )
-            releasePlayer()
             val mp = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -261,6 +277,7 @@ class VoiceUpAccessibilityService : AccessibilityService() {
             player = mp
             applyState(State.PLAYING)
         } catch (_: Exception) {
+            releasePlayer()
             applyState(State.IDLE)
         }
     }
