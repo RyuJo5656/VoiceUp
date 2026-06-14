@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/amplifier/amplifier_screen.dart';
+import 'features/onboarding/permissions_screen.dart';
 import 'features/phrase_pad/phrase_pad_screen.dart';
 import 'features/voice_journal/voice_journal_screen.dart';
 import 'features/voice_to_speech/voice_to_speech_screen.dart';
@@ -28,8 +31,55 @@ class VoiceUpApp extends StatelessWidget {
       title: 'VoiceUp',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const RootShell(),
+      home: const AppRoot(),
     );
+  }
+}
+
+/// Decides whether to show the first-run permissions screen or the main app.
+/// The onboarding appears until the user has seen it once *and* granted the
+/// essential microphone permission.
+class AppRoot extends StatefulWidget {
+  const AppRoot({super.key});
+
+  @override
+  State<AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<AppRoot> {
+  static const _seenKey = 'voiceup_onboarding_seen';
+
+  bool? _showOnboarding; // null while deciding
+
+  @override
+  void initState() {
+    super.initState();
+    _decide();
+  }
+
+  Future<void> _decide() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_seenKey) ?? false;
+    final micGranted = await Permission.microphone.isGranted;
+    if (!mounted) return;
+    setState(() => _showOnboarding = !(seen && micGranted));
+  }
+
+  Future<void> _finishOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_seenKey, true);
+    if (mounted) setState(() => _showOnboarding = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final show = _showOnboarding;
+    if (show == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return show
+        ? PermissionsScreen(onContinue: _finishOnboarding)
+        : const RootShell();
   }
 }
 
