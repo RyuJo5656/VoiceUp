@@ -70,7 +70,7 @@ class _PermissionsScreenState extends State<PermissionsScreen>
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
                 Text(
-                  'VoiceUp을 편하게 쓰려면 아래 권한이 필요해요.\n'
+                  '또랑을 편하게 쓰려면 아래 권한이 필요해요.\n'
                   '왜 필요한지 확인하고 허용해 주세요.',
                   style: TextStyle(fontSize: 15, height: 1.5, color: cs.onSurfaceVariant),
                 ),

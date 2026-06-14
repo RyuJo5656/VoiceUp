@@ -28,7 +28,7 @@ class VoiceUpApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VoiceUp',
+      title: '또랑',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       home: const AppRoot(),

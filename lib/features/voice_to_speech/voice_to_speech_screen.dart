@@ -186,8 +186,8 @@ class _VoiceToSpeechScreenState extends State<VoiceToSpeechScreen> {
         title: const Text('통화 보조 버튼 켜기'),
         content: const Text(
           '통화 화면 위에서도 눌리는 버튼을 띄우려면 "접근성" 권한이 필요해요.\n\n'
-          '설정 → 접근성 → VoiceUp 통화 보조 버튼 → 켜기\n\n'
-          'VoiceUp은 화면 내용을 읽지 않고, 버튼 표시 용도로만 사용합니다.',
+          '설정 → 접근성 → 또랑 통화 보조 버튼 → 켜기\n\n'
+          '또랑은 화면 내용을 읽지 않고, 버튼 표시 용도로만 사용합니다.',
         ),
         actions: [
           TextButton(
